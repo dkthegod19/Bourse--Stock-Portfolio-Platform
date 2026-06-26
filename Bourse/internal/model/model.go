@@ -8,22 +8,22 @@ import (
 
 // Entry is a single, immutable leg of a trade in the append-only event stream.
 // Every trade produces two entries whose signed values net to zero (double-entry).
-// For a stock leg, Quantity is shares and Price is cents/share. For the CASH leg,
-// Quantity is the amount in cents and Price is nil.
+// For a stock leg, Quantity is shares and Price is paise/share. For the CASH leg,
+// Quantity is the amount in paise and Price is nil. (₹1 = 100 paise.)
 type Entry struct {
 	ID          int64     `json:"id"`
 	TradeID     uuid.UUID `json:"trade_id"`
 	PortfolioID uuid.UUID `json:"portfolio_id"`
-	Instrument  string    `json:"instrument"` // "CASH" or a ticker like "AAPL"
+	Instrument  string    `json:"instrument"` // "CASH" or an NSE ticker like "RELIANCE"
 	Direction   int16     `json:"direction"`  // +1 in, -1 out
 	Quantity    int64     `json:"quantity"`
-	Price       *int64    `json:"price,omitempty"` // cents/share; nil for cash
+	Price       *int64    `json:"price,omitempty"` // paise/share; nil for cash
 	CreatedAt   time.Time `json:"created_at"`
 	Seq         int64     `json:"seq"`
 }
 
-// SignedValue returns the cents value of the entry signed by direction. For a
-// cash leg the per-unit price is 1 (quantity already in cents).
+// SignedValue returns the paise value of the entry signed by direction. For a
+// cash leg the per-unit price is 1 (quantity already in paise).
 func (e Entry) SignedValue() int64 {
 	unit := int64(1)
 	if e.Price != nil {
@@ -69,7 +69,7 @@ type Alert struct {
 	ID         uuid.UUID `json:"id"`
 	Symbol     string    `json:"symbol"`
 	Direction  string    `json:"direction"` // above | below
-	Threshold  int64     `json:"threshold"` // cents
+	Threshold  int64     `json:"threshold"` // paise
 	WebhookURL string    `json:"webhook_url"`
 	Triggered  bool      `json:"triggered"`
 	CreatedAt  time.Time `json:"created_at"`
@@ -78,25 +78,38 @@ type Alert struct {
 // Quote is a (cached) market price for a symbol.
 type Quote struct {
 	Symbol string `json:"symbol"`
-	Price  int64  `json:"price"` // cents
+	Price  int64  `json:"price"` // paise
 	AsOf   int64  `json:"as_of"` // unix millis
+}
+
+// StockQuote is a universe entry enriched with its live price and day-change,
+// used to power the "browse / trending" listings.
+type StockQuote struct {
+	Symbol    string  `json:"symbol"`
+	Name      string  `json:"name"`
+	Sector    string  `json:"sector"`
+	Exchange  string  `json:"exchange"`
+	Price     int64   `json:"price"`      // current, paise
+	PrevClose int64   `json:"prev_close"` // reference close, paise
+	Change    int64   `json:"change"`     // price - prev_close, paise
+	ChangePct float64 `json:"change_pct"` // percent
 }
 
 // Position is a derived holding of a single instrument.
 type Position struct {
-	Instrument string `json:"instrument"`
-	Quantity   int64  `json:"quantity"`
-	Price      int64  `json:"price"`       // latest cents/share
-	MarketValue int64 `json:"market_value"` // cents
+	Instrument  string `json:"instrument"`
+	Quantity    int64  `json:"quantity"`
+	Price       int64  `json:"price"`        // latest paise/share
+	MarketValue int64  `json:"market_value"` // paise
 }
 
 // PortfolioView is the derived, point-in-time state of a portfolio.
 type PortfolioView struct {
 	PortfolioID uuid.UUID  `json:"portfolio_id"`
-	Cash        int64      `json:"cash"`        // cents
+	Cash        int64      `json:"cash"` // paise
 	Positions   []Position `json:"positions"`
-	MarketValue int64      `json:"market_value"` // positions only, cents
-	TotalValue  int64      `json:"total_value"`  // cash + market value, cents
+	MarketValue int64      `json:"market_value"` // positions only, paise
+	TotalValue  int64      `json:"total_value"`  // cash + market value, paise
 	AsOf        time.Time  `json:"as_of"`
 }
 
