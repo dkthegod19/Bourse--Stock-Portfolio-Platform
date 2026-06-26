@@ -46,9 +46,9 @@ func (s *TradingService) runTx(ctx context.Context, fn func(tx pgx.Tx) error) er
 	return tx.Commit(ctx)
 }
 
-// CreatePortfolio creates a paper-trading account seeded with cash (in cents).
-func (s *TradingService) CreatePortfolio(ctx context.Context, name string, seedCents int64) (uuid.UUID, error) {
-	if seedCents < 0 {
+// CreatePortfolio creates a paper-trading account seeded with cash (in paise).
+func (s *TradingService) CreatePortfolio(ctx context.Context, name string, seedPaise int64) (uuid.UUID, error) {
+	if seedPaise < 0 {
 		return uuid.Nil, ValidationError{"seed cash cannot be negative"}
 	}
 	var id uuid.UUID
@@ -58,7 +58,7 @@ func (s *TradingService) CreatePortfolio(ctx context.Context, name string, seedC
 		if err != nil {
 			return err
 		}
-		if seedCents > 0 {
+		if seedPaise > 0 {
 			if _, err := s.portfolios.LockForUpdate(ctx, tx, id); err != nil {
 				return err
 			}
@@ -67,7 +67,7 @@ func (s *TradingService) CreatePortfolio(ctx context.Context, name string, seedC
 				PortfolioID: id,
 				Instrument:  "CASH",
 				Direction:   1,
-				Quantity:    seedCents,
+				Quantity:    seedPaise,
 				Seq:         1,
 			}
 			if err := s.entries.Insert(ctx, tx, entry); err != nil {

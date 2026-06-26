@@ -27,7 +27,7 @@ func (r *EntryRepository) Insert(ctx context.Context, q store.Querier, e model.E
 // Holdings returns net quantity per instrument for a portfolio, derived purely
 // from the event stream. If asOf is non-nil, only entries up to that time count
 // (this powers point-in-time queries). "CASH" net quantity is the cash balance
-// in cents.
+// in paise.
 func (r *EntryRepository) Holdings(ctx context.Context, q store.Querier, portfolioID uuid.UUID, asOf *time.Time) (map[string]int64, error) {
 	var rows pgx.Rows
 	var err error

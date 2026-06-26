@@ -173,8 +173,12 @@ func (w *Worker) handleSettle(ctx context.Context, job *model.Job) error {
 }
 
 func (w *Worker) handlePollQuotes(ctx context.Context, job *model.Job) error {
-	// Symbols to refresh: everything ever traded + symbols with active alerts.
+	// Symbols to refresh: the whole tradable universe (so browse/trending stays
+	// fresh before any trade) + everything ever traded + active-alert symbols.
 	symSet := map[string]struct{}{}
+	for _, s := range w.md.UniverseSymbols() {
+		symSet[s] = struct{}{}
+	}
 	traded, err := w.entries.DistinctSymbols(ctx, w.pool)
 	if err != nil {
 		return err

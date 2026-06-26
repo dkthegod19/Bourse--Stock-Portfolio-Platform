@@ -23,7 +23,7 @@ func NewAlertService(pool *pgxpool.Pool, alerts *repository.AlertRepository) *Al
 type CreateAlertRequest struct {
 	Symbol     string `json:"symbol"`
 	Direction  string `json:"direction"` // above | below
-	Threshold  int64  `json:"threshold"` // cents
+	Threshold  int64  `json:"threshold"` // paise
 	WebhookURL string `json:"webhook_url"`
 }
 
@@ -35,7 +35,7 @@ func (s *AlertService) Create(ctx context.Context, req CreateAlertRequest) (uuid
 		return uuid.Nil, ValidationError{"direction must be 'above' or 'below'"}
 	}
 	if req.Threshold <= 0 {
-		return uuid.Nil, ValidationError{"threshold must be positive (cents)"}
+		return uuid.Nil, ValidationError{"threshold must be positive (paise)"}
 	}
 	if req.WebhookURL == "" {
 		return uuid.Nil, ValidationError{"webhook_url is required"}
