@@ -27,7 +27,7 @@ func (c *PortfolioController) Routes(r chi.Router) {
 
 type createPortfolioReq struct {
 	Name      string `json:"name"`
-	SeedCents int64  `json:"seed_cents"`
+	SeedPaise int64  `json:"seed_paise"`
 }
 
 func (c *PortfolioController) create(w http.ResponseWriter, r *http.Request) {
@@ -39,12 +39,12 @@ func (c *PortfolioController) create(w http.ResponseWriter, r *http.Request) {
 	if req.Name == "" {
 		req.Name = "default"
 	}
-	id, err := c.trading.CreatePortfolio(r.Context(), req.Name, req.SeedCents)
+	id, err := c.trading.CreatePortfolio(r.Context(), req.Name, req.SeedPaise)
 	if err != nil {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"id": id, "name": req.Name, "seed_cents": req.SeedCents})
+	writeJSON(w, http.StatusCreated, map[string]any{"id": id, "name": req.Name, "seed_paise": req.SeedPaise})
 }
 
 func (c *PortfolioController) get(w http.ResponseWriter, r *http.Request) {
