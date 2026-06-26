@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS entries (
     instrument   TEXT        NOT NULL,             -- 'CASH' or a ticker
     direction    SMALLINT    NOT NULL,             -- +1 in, -1 out
     quantity     BIGINT      NOT NULL CHECK (quantity > 0),
-    price        BIGINT,                           -- cents/share; NULL for cash
+    price        BIGINT,                           -- paise/share; NULL for cash
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     seq          BIGINT      NOT NULL
 );
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS alerts (
     id          UUID PRIMARY KEY,
     symbol      TEXT NOT NULL,
     direction   TEXT NOT NULL,        -- above | below
-    threshold   BIGINT NOT NULL,      -- cents
+    threshold   BIGINT NOT NULL,      -- paise
     webhook_url TEXT NOT NULL,
     triggered   BOOLEAN NOT NULL DEFAULT false,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()

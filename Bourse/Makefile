@@ -1,4 +1,4 @@
-.PHONY: help tidy migrate run-api run-worker up down logs loadtest fmt
+.PHONY: help tidy migrate run-api run-worker up down logs loadtest fmt web-install web-dev web-build
 
 DATABASE_URL ?= postgres://bourse:bourse@localhost:5432/bourse?sslmode=disable
 REDIS_URL    ?= redis://localhost:6379/0
@@ -9,6 +9,9 @@ help:
 	@echo "  migrate     - apply SQL migrations to \$$DATABASE_URL"
 	@echo "  run-api     - run the API server locally"
 	@echo "  run-worker  - run the worker locally"
+	@echo "  web-install - install frontend deps (npm install in frontend/)"
+	@echo "  web-dev     - run the React dev server (proxies API to :8080)"
+	@echo "  web-build   - build the frontend to frontend/dist (served by the API)"
 	@echo "  up          - docker compose up (full stack)"
 	@echo "  down        - docker compose down -v"
 	@echo "  loadtest    - run the concurrency load test (needs API running)"
@@ -30,6 +33,15 @@ up:
 
 down:
 	docker compose -f deploy/docker-compose.yml down -v
+
+web-install:
+	cd frontend && npm install
+
+web-dev:
+	cd frontend && npm run dev
+
+web-build:
+	cd frontend && npm install && npm run build
 
 loadtest:
 	go run ./loadtest

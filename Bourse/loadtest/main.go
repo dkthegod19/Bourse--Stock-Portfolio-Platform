@@ -52,7 +52,7 @@ func rateLimitTest() bool {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			req, _ := http.NewRequest("GET", base+"/v1/quotes/AAPL", nil)
+			req, _ := http.NewRequest("GET", base+"/v1/quotes/RELIANCE", nil)
 			req.Header.Set("X-API-Key", key)
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
@@ -87,18 +87,18 @@ func rateLimitTest() bool {
 
 func concurrencyTest() bool {
 	fmt.Println("\n[2] Concurrent sells of a single position")
-	// Seed $100,000.
+	// Seed ₹10,00,000 (in paise).
 	var pf struct {
 		ID string `json:"id"`
 	}
-	post("/v1/portfolios", map[string]any{"name": "loadtest", "seed_cents": 10000000}, &pf)
+	post("/v1/portfolios", map[string]any{"name": "loadtest", "seed_paise": 100000000}, &pf)
 	if pf.ID == "" {
 		fmt.Println("    FAIL: could not create portfolio")
 		return false
 	}
 
 	// Buy 100 shares and wait for the fill.
-	buy := placeOrder(pf.ID, "buy", "AAPL", 100, "market")
+	buy := placeOrder(pf.ID, "buy", "RELIANCE", 100, "market")
 	if !waitFilled(buy) {
 		fmt.Println("    FAIL: buy did not fill")
 		return false
@@ -112,7 +112,7 @@ func concurrencyTest() bool {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			ids[i] = placeOrder(pf.ID, "sell", "AAPL", 100, "market")
+			ids[i] = placeOrder(pf.ID, "sell", "RELIANCE", 100, "market")
 		}(i)
 	}
 	wg.Wait()
@@ -129,7 +129,7 @@ func concurrencyTest() bool {
 		}
 	}
 
-	// Final holdings must be exactly zero AAPL (never negative).
+	// Final holdings must be exactly zero RELIANCE (never negative).
 	var view struct {
 		Positions []struct {
 			Instrument string `json:"instrument"`
@@ -139,11 +139,11 @@ func concurrencyTest() bool {
 	get("/v1/portfolios/"+pf.ID, &view)
 	aapl := int64(0)
 	for _, p := range view.Positions {
-		if p.Instrument == "AAPL" {
+		if p.Instrument == "RELIANCE" {
 			aapl = p.Quantity
 		}
 	}
-	fmt.Printf("    sells filled=%d rejected=%d final AAPL position=%d\n", filled, rejected, aapl)
+	fmt.Printf("    sells filled=%d rejected=%d final RELIANCE position=%d\n", filled, rejected, aapl)
 
 	if filled != 1 {
 		fmt.Println("    FAIL: expected exactly one sell to fill")

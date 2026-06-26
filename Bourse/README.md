@@ -1,7 +1,11 @@
 # Bourse
 
-A paper-trading / portfolio backend that combines three deep subsystems into one
-real-world product:
+An **Indian-market** paper-trading / portfolio platform. Browse trending NSE
+stocks (RELIANCE, TCS, INFY, HDFCBANK, …), buy and sell them, and watch your
+portfolio update live — backed by a serious, production-shaped Go backend and a
+polished React frontend.
+
+It combines three deep subsystems into one real-world product:
 
 - **Event-sourced trading core** — every trade is an immutable, append-only,
   double-entry event. Cash and positions are *derived* by replaying the stream,
@@ -16,10 +20,15 @@ real-world product:
   rate-limit headers.
 
 Plus read-through **caching** of live quotes and derived portfolio snapshots, a
-live external **market-data** integration (Finnhub, with an offline stub), and
-three minimal **dashboards**.
+live external **market-data** integration (Finnhub NSE quotes, with a realistic
+offline stub of ~25 real NSE large-caps), and a **beautiful React UI** for
+browsing trending stocks and trading them.
 
-Written in Go, layered as **controller → service → repository**.
+Money is handled in **paise** (integers; ₹1 = 100 paise) and displayed with
+Indian digit grouping (lakh / crore).
+
+Written in Go, layered as **controller → service → repository**, with a
+**Vite + React + Tailwind** frontend.
 
 ---
 
@@ -54,6 +63,7 @@ Client / UI ─► [Rate limiter middleware] ─► HTTP API (chi)
 ## Prerequisites
 
 - **Go 1.22+**
+- **Node 18+** (for the React frontend; only needed for local non-Docker runs)
 - **PostgreSQL 14+** and **Redis 7+** (or just Docker — see below)
 - `psql` on your PATH (for running migrations locally)
 
@@ -61,13 +71,15 @@ Client / UI ─► [Rate limiter middleware] ─► HTTP API (chi)
 
 ## Quick start (Docker — recommended)
 
-One command brings up Postgres, Redis, migrations, the API, and the worker:
+One command builds the React UI, then brings up Postgres, Redis, migrations, the
+API, and the worker:
 
 ```bash
 docker compose -f deploy/docker-compose.yml up --build
 ```
 
-Then open **http://localhost:8080/** for the dashboards.
+Then open **http://localhost:8080/** for the trading UI (the API serves the
+built frontend).
 
 To use real market prices instead of the stub:
 
@@ -113,7 +125,19 @@ docker compose -f deploy/docker-compose.yml down -v
    make run-worker
    ```
 
-5. Open **http://localhost:8080/**.
+5. **Run the frontend.** For development, the Vite dev server proxies the API:
+
+   ```bash
+   make web-dev        # http://localhost:5173 (hot reload)
+   ```
+
+   For a production-style run, build it once and let the API serve it:
+
+   ```bash
+   make web-build      # outputs frontend/dist
+   ```
+
+   Then open **http://localhost:8080/** — the API serves `frontend/dist`.
 
 Configuration is via environment variables (see `.env.example`); every value has
 a local default.
@@ -123,16 +147,20 @@ a local default.
 ## Try it with curl
 
 ```bash
-# Create a portfolio seeded with $100,000 (amounts are in cents).
+# Browse trending NSE stocks (top movers) and the full universe.
+curl -s localhost:8080/v1/stocks/trending -H 'X-API-Key: demo'
+curl -s localhost:8080/v1/stocks -H 'X-API-Key: demo'
+
+# Create a portfolio seeded with ₹10,00,000 (amounts are in paise).
 curl -s -XPOST localhost:8080/v1/portfolios \
   -H 'X-API-Key: demo' -H 'Content-Type: application/json' \
-  -d '{"name":"demo","seed_cents":10000000}'
+  -d '{"name":"demo","seed_paise":100000000}'
 # -> {"id":"<PF>", ...}
 
 # Place a market buy (execution is async via the worker).
 curl -s -XPOST localhost:8080/v1/orders \
   -H 'X-API-Key: demo' -H 'Content-Type: application/json' \
-  -d '{"portfolio_id":"<PF>","side":"buy","instrument":"AAPL","quantity":10,"type":"market"}'
+  -d '{"portfolio_id":"<PF>","side":"buy","instrument":"RELIANCE","quantity":10,"type":"market"}'
 
 # Read the derived portfolio (cash + positions + value).
 curl -s localhost:8080/v1/portfolios/<PF> -H 'X-API-Key: demo'
@@ -161,20 +189,23 @@ are returned on every response.
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/v1/portfolios` | Create a portfolio (`name`, `seed_cents`). |
+| GET | `/v1/stocks` | Full NSE universe with live price + day-change %. |
+| GET | `/v1/stocks/trending` | Top movers; `?limit=N` (default 6). |
+| POST | `/v1/portfolios` | Create a portfolio (`name`, `seed_paise`). |
 | GET | `/v1/portfolios/{id}` | Derived view; `?as_of=<RFC3339>` for point-in-time. |
 | GET | `/v1/portfolios/{id}/history` | Event stream + recent orders (audit trail). |
 | POST | `/v1/orders` | Place order; `Idempotency-Key` header or `idempotency_key` body field. |
 | GET | `/v1/orders/{id}` | Order status. |
 | DELETE | `/v1/orders/{id}` | Cancel a pending order. |
-| GET | `/v1/quotes/{symbol}` | Live (cached) quote. |
+| GET | `/v1/quotes/{symbol}` | Live (cached) quote, e.g. `RELIANCE`. |
 | POST | `/v1/alerts` | Create a price alert (`symbol`, `direction`, `threshold`, `webhook_url`). |
 | GET | `/v1/admin/queue/stats` | Queue depth, in-flight, done, dead. |
 | GET | `/v1/admin/queue/dead` | Dead-letter contents. |
 | POST | `/v1/admin/queue/dead/{id}/replay` | Replay a dead-lettered job. |
 | GET/PUT | `/v1/admin/limits/{key}` | Read / set per-key rate limit. |
 
-Money is always in **cents** (integers); share quantities are whole integers.
+Money is always in **paise** (integers; ₹1 = 100 paise); share quantities are
+whole integers.
 
 ---
 
@@ -190,9 +221,9 @@ It asserts two properties:
 
 1. **Rate limiter** — 500 concurrent requests against a tightly-limited key; the
    number allowed must match the token-bucket math (no double-spend).
-2. **Trading concurrency** — buys a position, then fires 5 concurrent sells of
-   the whole position; asserts exactly one fills and holdings never go negative
-   (no lost updates).
+2. **Trading concurrency** — buys a RELIANCE position, then fires 5 concurrent
+   sells of the whole position; asserts exactly one fills and holdings never go
+   negative (no lost updates).
 
 ---
 
@@ -276,12 +307,12 @@ internal/
   ratelimit      token-bucket + sliding-window limiter (Lua)
   marketdata     price provider (stub + Finnhub)
   service        business logic (trading, marketdata, queue, alert)
-  controller     HTTP handlers
+  controller     HTTP handlers (incl. /v1/stocks, /v1/stocks/trending)
   middleware     rate-limit middleware
-  api            chi router + dependency wiring
+  api            chi router + SPA static serving + dependency wiring
   worker         job engine, handlers, lease reaper
 migrations       SQL schema
-ui               static dashboards
+frontend         Vite + React + Tailwind trading UI (built to frontend/dist)
 loadtest         concurrency / rate-limit correctness harness
 deploy           docker-compose.yml, fly.toml
 ```
