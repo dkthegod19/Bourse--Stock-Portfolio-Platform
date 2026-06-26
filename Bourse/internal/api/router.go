@@ -3,6 +3,8 @@ package api
 import (
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"bourse/internal/controller"
@@ -48,20 +50,39 @@ func NewRouter(d Deps) http.Handler {
 		controller.NewAdminController(d.Queue, d.Limiter).Routes(api)
 	})
 
-	// Static dashboards.
+	// Static single-page app (the built Vite/React frontend). Serve real files
+	// when they exist and fall back to index.html so the SPA loads at any path.
 	uiDir := d.UIDir
 	if uiDir == "" {
-		uiDir = "ui"
+		uiDir = "frontend/dist"
 	}
-	if _, err := os.Stat(uiDir); err == nil {
-		fs := http.FileServer(http.Dir(uiDir))
-		r.Handle("/ui/*", http.StripPrefix("/ui/", fs))
-		r.Get("/", func(w http.ResponseWriter, req *http.Request) {
-			http.Redirect(w, req, "/ui/", http.StatusFound)
-		})
+	if _, err := os.Stat(filepath.Join(uiDir, "index.html")); err == nil {
+		r.Handle("/*", spaHandler(uiDir))
 	}
 
 	return r
+}
+
+// spaHandler serves static assets from dir and returns index.html for any path
+// that doesn't map to a file (so client-side routing / deep links work).
+func spaHandler(dir string) http.Handler {
+	fs := http.FileServer(http.Dir(dir))
+	index := filepath.Join(dir, "index.html")
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		clean := filepath.Clean(r.URL.Path)
+		// Never let the SPA shadow the API or health surfaces.
+		if strings.HasPrefix(clean, "/v1") || clean == "/healthz" {
+			http.NotFound(w, r)
+			return
+		}
+		if clean != "/" {
+			if _, err := os.Stat(filepath.Join(dir, clean)); err == nil {
+				fs.ServeHTTP(w, r)
+				return
+			}
+		}
+		http.ServeFile(w, r, index)
+	})
 }
 
 // corsAllowAll lets the static dashboard call the API from a browser during
