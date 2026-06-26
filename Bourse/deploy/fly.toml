@@ -1,0 +1,32 @@
+# Fly.io deployment. Runs the API and the worker as two process groups from the
+# same image. Postgres (Neon) and Redis (Upstash) are external managed services
+# set via `fly secrets` — see the README for the free-tier setup.
+#
+#   fly launch --no-deploy --copy-config --dockerfile Dockerfile
+#   fly secrets set DATABASE_URL=... REDIS_URL=... MARKETDATA_PROVIDER=stub
+#   fly deploy
+app = "bourse"
+primary_region = "iad"
+
+[build]
+  dockerfile = "../Dockerfile"
+
+[processes]
+  api = "/app/api"
+  worker = "/app/worker"
+
+[env]
+  PORT = "8080"
+  UI_DIR = "/app/ui"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["api"]
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

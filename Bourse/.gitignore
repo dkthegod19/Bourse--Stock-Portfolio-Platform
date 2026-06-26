@@ -1,0 +1,14 @@
+# Binaries
+/api
+/worker
+*.exe
+
+# Env
+.env
+
+# Editor
+.idea/
+*.iml
+
+# Go
+/vendor/
