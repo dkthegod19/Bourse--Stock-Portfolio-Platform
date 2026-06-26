@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bourse — Dashboards</title>
+<style>
+  :root { --bg:#0f1419; --panel:#1a2029; --line:#2a3340; --fg:#e6edf3; --muted:#8b97a7; --green:#3fb950; --red:#f85149; --accent:#58a6ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background:var(--bg); color:var(--fg); }
+  header { padding:16px 24px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:24px; }
+  header h1 { font-size:18px; margin:0; letter-spacing:1px; }
+  nav button { background:none; border:none; color:var(--muted); cursor:pointer; font:inherit; padding:8px 4px; border-bottom:2px solid transparent; }
+  nav button.active { color:var(--fg); border-bottom-color:var(--accent); }
+  main { padding:24px; max-width:1100px; margin:0 auto; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:16px 20px; margin-bottom:20px; }
+  .panel h2 { margin:0 0 12px; font-size:14px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:8px 0 2px; }
+  input, select { background:var(--bg); border:1px solid var(--line); color:var(--fg); padding:6px 8px; border-radius:4px; font:inherit; }
+  button.go { background:var(--accent); color:#0b1117; border:none; padding:7px 14px; border-radius:4px; cursor:pointer; font:inherit; font-weight:600; }
+  button.go:hover { opacity:.9; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:normal; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+  .stat { display:inline-block; margin-right:28px; }
+  .stat .n { font-size:28px; font-weight:700; }
+  .stat .l { font-size:11px; color:var(--muted); text-transform:uppercase; }
+  .pos { color:var(--green); } .neg { color:var(--red); }
+  pre { background:var(--bg); padding:10px; border-radius:4px; overflow:auto; font-size:12px; color:var(--muted); }
+  .tag { font-size:11px; padding:2px 6px; border-radius:3px; background:var(--line); }
+  .hide { display:none; }
+  small.hint { color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>BOURSE</h1>
+  <nav>
+    <button data-tab="portfolio" class="active">Portfolio</button>
+    <button data-tab="queue">Queue Health</button>
+    <button data-tab="limits">Rate Limits</button>
+  </nav>
+  <span style="margin-left:auto"><label style="display:inline">API Key</label>
+    <input id="apiKey" value="demo-key" style="width:120px" /></span>
+</header>
+<main>
+  <!-- PORTFOLIO -->
+  <section id="tab-portfolio">
+    <div class="panel">
+      <h2>Create paper-trading portfolio</h2>
+      <div class="row">
+        <div><label>Name</label><input id="pfName" value="my-portfolio" /></div>
+        <div><label>Seed cash (USD)</label><input id="pfCash" type="number" value="100000" /></div>
+        <button class="go" onclick="createPortfolio()">Create</button>
+      </div>
+      <p><small class="hint" id="pfCreated"></small></p>
+    </div>
+
+    <div class="panel">
+      <h2>Place order</h2>
+      <div class="row">
+        <div><label>Portfolio ID</label><input id="ordPf" style="width:300px" placeholder="uuid" /></div>
+        <div><label>Side</label><select id="ordSide"><option>buy</option><option>sell</option></select></div>
+        <div><label>Symbol</label><input id="ordSym" value="AAPL" style="width:90px" /></div>
+        <div><label>Qty (shares)</label><input id="ordQty" type="number" value="10" style="width:90px" /></div>
+        <div><label>Type</label><select id="ordType" onchange="toggleLimit()"><option>market</option><option>limit</option></select></div>
+        <div id="limitWrap" class="hide"><label>Limit (USD)</label><input id="ordLimit" type="number" value="150" style="width:90px" /></div>
+        <button class="go" onclick="placeOrder()">Place</button>
+      </div>
+      <p><small class="hint" id="ordResult"></small></p>
+    </div>
+
+    <div class="panel">
+      <h2>Portfolio view <button class="go" style="float:right" onclick="loadPortfolio()">Refresh</button></h2>
+      <div class="row">
+        <div><label>Portfolio ID</label><input id="viewPf" style="width:300px" placeholder="uuid" /></div>
+        <div><label>As of (optional, RFC3339)</label><input id="viewAsOf" style="width:220px" placeholder="2026-06-26T00:00:00Z" /></div>
+      </div>
+      <div id="pfView" style="margin-top:14px"></div>
+    </div>
+  </section>
+
+  <!-- QUEUE -->
+  <section id="tab-queue" class="hide">
+    <div class="panel">
+      <h2>Queue stats <span class="tag" id="queueLive">live</span></h2>
+      <div id="queueStats"></div>
+    </div>
+    <div class="panel">
+      <h2>Dead-letter queue</h2>
+      <div id="deadList"></div>
+    </div>
+  </section>
+
+  <!-- LIMITS -->
+  <section id="tab-limits" class="hide">
+    <div class="panel">
+      <h2>Configure per-key rate limit</h2>
+      <div class="row">
+        <div><label>API key</label><input id="limKey" value="demo-key" /></div>
+        <div><label>Mode</label><select id="limMode"><option value="token">token</option><option value="sliding">sliding</option></select></div>
+        <div><label>Rate</label><input id="limRate" type="number" value="10" style="width:80px" /></div>
+        <div><label>Burst</label><input id="limBurst" type="number" value="20" style="width:80px" /></div>
+        <div><label>Window (ms)</label><input id="limWindow" type="number" value="1000" style="width:90px" /></div>
+        <button class="go" onclick="setLimit()">Save</button>
+        <button class="go" style="background:#2a3340;color:var(--fg)" onclick="getLimit()">Load</button>
+      </div>
+      <p><small class="hint" id="limResult"></small></p>
+    </div>
+    <div class="panel">
+      <h2>Live limiter probe</h2>
+      <p><small class="hint">Fires N rapid requests with the API key above and reports allow/deny + headers.</small></p>
+      <div class="row">
+        <div><label>Requests</label><input id="probeN" type="number" value="30" style="width:80px" /></div>
+        <button class="go" onclick="probe()">Fire</button>
+      </div>
+      <div id="probeResult" style="margin-top:12px"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const apiKey = () => $('apiKey').value || 'demo-key';
+const usd = cents => '$' + (cents/100).toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+
+async function api(method, path, body) {
+  const res = await fetch('/v1' + path, {
+    method,
+    headers: {'Content-Type':'application/json', 'X-API-Key': apiKey()},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  let data; try { data = JSON.parse(text); } catch { data = text; }
+  return {status: res.status, data, headers: res.headers};
+}
+
+// Tabs
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  ['portfolio','queue','limits'].forEach(t => $('tab-'+t).classList.add('hide'));
+  $('tab-'+b.dataset.tab).classList.remove('hide');
+  if (b.dataset.tab === 'queue') refreshQueue();
+});
+
+function toggleLimit(){ $('limitWrap').classList.toggle('hide', $('ordType').value !== 'limit'); }
+
+async function createPortfolio() {
+  const r = await api('POST','/portfolios',{name:$('pfName').value, seed_cents: Math.round(Number($('pfCash').value)*100)});
+  if (r.status===201) {
+    $('pfCreated').textContent = 'Created: ' + r.data.id;
+    $('ordPf').value = r.data.id; $('viewPf').value = r.data.id;
+  } else $('pfCreated').textContent = 'Error: ' + JSON.stringify(r.data);
+}
+
+async function placeOrder() {
+  const body = {portfolio_id:$('ordPf').value, side:$('ordSide').value, instrument:$('ordSym').value.toUpperCase(),
+    quantity:Number($('ordQty').value), type:$('ordType').value};
+  if (body.type==='limit') body.limit_price = Math.round(Number($('ordLimit').value)*100);
+  const r = await api('POST','/orders',body);
+  $('ordResult').textContent = r.status + ' → ' + JSON.stringify(r.data);
+  setTimeout(loadPortfolio, 800); // execution is async
+}
+
+async function loadPortfolio() {
+  const id = $('viewPf').value; if (!id) return;
+  let path = '/portfolios/'+id;
+  if ($('viewAsOf').value) path += '?as_of='+encodeURIComponent($('viewAsOf').value);
+  const r = await api('GET',path);
+  if (r.status!==200){ $('pfView').innerHTML = '<small class="hint">'+JSON.stringify(r.data)+'</small>'; return; }
+  const v = r.data;
+  let rows = (v.positions||[]).map(p =>
+    `<tr><td>${p.instrument}</td><td>${p.quantity}</td><td>${usd(p.price)}</td><td>${usd(p.market_value)}</td></tr>`).join('');
+  $('pfView').innerHTML = `
+    <div class="stat"><div class="n">${usd(v.cash)}</div><div class="l">Cash</div></div>
+    <div class="stat"><div class="n">${usd(v.market_value)}</div><div class="l">Positions</div></div>
+    <div class="stat"><div class="n">${usd(v.total_value)}</div><div class="l">Total value</div></div>
+    <table style="margin-top:12px"><tr><th>Symbol</th><th>Qty</th><th>Price</th><th>Mkt value</th></tr>${rows||'<tr><td colspan=4><small class="hint">no positions</small></td></tr>'}</table>`;
+}
+
+// Queue
+async function refreshQueue() {
+  const s = await api('GET','/admin/queue/stats');
+  if (s.status===200) {
+    const d = s.data;
+    $('queueStats').innerHTML =
+      `<div class="stat"><div class="n">${d.queued}</div><div class="l">Queued</div></div>
+       <div class="stat"><div class="n">${d.inflight}</div><div class="l">In-flight</div></div>
+       <div class="stat"><div class="n">${d.done}</div><div class="l">Done</div></div>
+       <div class="stat"><div class="n neg">${d.dead}</div><div class="l">Dead</div></div>`;
+  }
+  const dl = await api('GET','/admin/queue/dead');
+  if (dl.status===200) {
+    const items = dl.data.dead_letters||[];
+    $('deadList').innerHTML = items.length ? '<table><tr><th>ID</th><th>Type</th><th>Attempts</th><th>Error</th><th></th></tr>'+
+      items.map(j=>`<tr><td>${j.id.slice(0,8)}</td><td>${j.type}</td><td>${j.attempts}</td><td>${j.last_error||''}</td>
+        <td><button class="go" onclick="replay('${j.id}')">replay</button></td></tr>`).join('')+'</table>'
+      : '<small class="hint">empty</small>';
+  }
+}
+async function replay(id){ await api('POST','/admin/queue/dead/'+id+'/replay'); refreshQueue(); }
+
+// Limits
+async function setLimit() {
+  const body = {mode:$('limMode').value, rate:Number($('limRate').value), burst:Number($('limBurst').value), window_ms:Number($('limWindow').value)};
+  const r = await api('PUT','/admin/limits/'+encodeURIComponent($('limKey').value), body);
+  $('limResult').textContent = r.status+' → '+JSON.stringify(r.data);
+}
+async function getLimit() {
+  const r = await api('GET','/admin/limits/'+encodeURIComponent($('limKey').value));
+  $('limResult').textContent = r.status+' → '+JSON.stringify(r.data);
+}
+async function probe() {
+  const n = Number($('probeN').value); let allow=0, deny=0, lastHeaders='';
+  for (let i=0;i<n;i++){
+    const res = await fetch('/v1/quotes/AAPL',{headers:{'X-API-Key':$('limKey').value}});
+    if (res.status===429) deny++; else allow++;
+    lastHeaders = `limit=${res.headers.get('X-RateLimit-Limit')} remaining=${res.headers.get('X-RateLimit-Remaining')} reset=${res.headers.get('X-RateLimit-Reset')}`;
+  }
+  $('probeResult').innerHTML =
+    `<div class="stat"><div class="n pos">${allow}</div><div class="l">Allowed</div></div>
+     <div class="stat"><div class="n neg">${deny}</div><div class="l">Denied (429)</div></div>
+     <pre>${lastHeaders}</pre>`;
+}
+
+// Auto-refresh queue every 3s while on that tab.
+setInterval(() => { if (!$('tab-queue').classList.contains('hide')) refreshQueue(); }, 3000);
+</script>
+</body>
+</html>
