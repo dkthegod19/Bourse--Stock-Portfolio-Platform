@@ -14,15 +14,15 @@
 
 The trading dashboard — trending NSE movers, a searchable stock universe, and live portfolio summary, all in Indian numbering (lakh / crore):
 
-![Bourse dashboard](docs/screenshots/dashboard.png)
+![Bourse dashboard](Bourse/docs/screenshots/dashboard.png)
 
 Place a market order from anywhere — quantity stepper, live cash check, and estimated total:
 
-![Trade modal](docs/screenshots/trade-modal.png)
+![Trade modal](Bourse/docs/screenshots/trade-modal.png)
 
 Your holdings, derived live by replaying the event stream:
 
-![Holdings](docs/screenshots/holdings.png)
+![Holdings](Bourse/docs/screenshots/holdings.png)
 
 ---
 
