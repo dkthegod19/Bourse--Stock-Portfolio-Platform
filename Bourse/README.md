@@ -1,5 +1,33 @@
 # Bourse
 
+> An **Indian-market** paper-trading platform — browse trending NSE stocks, buy and sell them, and watch your portfolio update live. Built on a production-shaped, event-sourced Go backend with a custom Postgres job queue and a Redis rate limiter, fronted by a polished React UI.
+
+![Go](https://img.shields.io/badge/Go-1.22-00ADD8?logo=go&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-event--sourced-4169E1?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-rate--limiting-DC382D?logo=redis&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)
+
+---
+
+## Preview
+
+The trading dashboard — trending NSE movers, a searchable stock universe, and live portfolio summary, all in Indian numbering (lakh / crore):
+
+![Bourse dashboard](docs/screenshots/dashboard.png)
+
+Place a market order from anywhere — quantity stepper, live cash check, and estimated total:
+
+![Trade modal](docs/screenshots/trade-modal.png)
+
+Your holdings, derived live by replaying the event stream:
+
+![Holdings](docs/screenshots/holdings.png)
+
+---
+
+## Overview
+
 An **Indian-market** paper-trading / portfolio platform. Browse trending NSE
 stocks (RELIANCE, TCS, INFY, HDFCBANK, …), buy and sell them, and watch your
 portfolio update live — backed by a serious, production-shaped Go backend and a
@@ -29,6 +57,16 @@ Indian digit grouping (lakh / crore).
 
 Written in Go, layered as **controller → service → repository**, with a
 **Vite + React + Tailwind** frontend.
+
+### Tech stack
+
+| Area | Stack |
+|---|---|
+| Backend | Go 1.22, chi router, pgx |
+| Data | PostgreSQL (event store + job queue), Redis (cache + rate-limit state) |
+| Frontend | React 18, Vite, Tailwind CSS |
+| Infra | Docker / docker-compose; deploys to Fly.io + Neon + Upstash |
+| External | Finnhub market data (with an offline NSE stub) |
 
 ---
 
@@ -247,7 +285,7 @@ It asserts two properties:
 
 ---
 
-## Deploy for free (to showcase on a resume)
+## Deploy
 
 The cheapest reliable combo is **Fly.io** (app) + **Neon** (Postgres) +
 **Upstash** (Redis) — all have free tiers.
